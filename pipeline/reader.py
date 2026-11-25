@@ -26,10 +26,12 @@ class Number(str):
 def read(body):
     """Returns the order, or raises Unreadable with the reason."""
     try:
-        # Not json.loads(body): from bytes it guesses UTF-16 and takes a BOM. A byte that is not UTF-8 is kept, because
-        # webhook-platform only minds it in a field that it reads.
-        text = body.decode("utf-8", "surrogateescape")
-        root = json.loads(text, object_pairs_hook=_names_once, parse_int=Number, parse_float=Number, parse_constant=_refuse)
+        # Not from bytes: there Python guesses UTF-16 and takes a BOM. A byte that is not UTF-8 is kept, because webhook-platform only
+        # minds it in a field that it reads.
+        root = _parsed(body.decode("utf-8", "surrogateescape"), _names_once)
+        # Half a character that is written as an escape is minded in every name. So once more, without those bytes.
+        if b"\\" in body:
+            _parsed(body.decode("utf-8", "replace"), _names_whole)
     except (ValueError, RecursionError):
         raise Unreadable(NOT_JSON) from None
     if _depth(root) > DEEPEST:
@@ -48,6 +50,10 @@ def read(body):
     }
 
 
+def _parsed(text, names):
+    return json.loads(text, object_pairs_hook=names, parse_int=Number, parse_float=Number, parse_constant=_refuse)
+
+
 def _refuse(word):
     # NaN and Infinity, which are no JSON.
     raise Unreadable(NOT_JSON)
@@ -55,9 +61,14 @@ def _refuse(word):
 
 def _names_once(pairs):
     found = dict(pairs)
-    if len(found) != len(pairs) or any(_half(name) for name in found):
+    if len(found) != len(pairs):
         raise Unreadable(NOT_JSON)
     return found
+
+
+def _names_whole(pairs):
+    if any(_half(name) for name, _ in pairs):
+        raise Unreadable(NOT_JSON)
 
 
 def _half(text):

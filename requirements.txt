@@ -1,0 +1,6 @@
+# Each for Linux (GitHub's runners) and for a Mac with an Arm processor, Python 3.12.
+duckdb==1.5.6 \
+    --hash=sha256:bc9619ed7d4ffa117b5155d84b44794366bb6635178d78ed5e13a6024845c757 \
+    --hash=sha256:dcccce20965e6986cd083fdf192c461685ad0b93cd1ccd0b2a8207f1185f078b
+tzdata==2026.6 \
+    --hash=sha256:0a10eec6e13ef16b627fabed9a5f2ba61a62b1c67f327305f4e7e412a70b4aec

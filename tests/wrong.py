@@ -39,39 +39,48 @@ def change(name, what, noticed_by, *changes):
     return Wrong(name, what, noticed_by, changes)
 
 
-LOADS = "json.loads(text, object_pairs_hook=_names_once, parse_int=Number, parse_float=Number, parse_constant=_refuse)"
-DECODE = 'text = body.decode("utf-8", "surrogateescape")'
+LOADS = "json.loads(text, object_pairs_hook=names, parse_int=Number, parse_float=Number, parse_constant=_refuse)"
+DECODE = 'body.decode("utf-8", "surrogateescape")'
 TEXT = "if not isinstance(value, str) or isinstance(value, Number):"
 WHOLE = "if not isinstance(value, Number) or not WHOLE.fullmatch(value) or not least <= int(value) <= most:"
-TWICE = "if len(found) != len(pairs) or any(_half(name) for name in found):"
+TWICE, HALVES = "if len(found) != len(pairs):", "if any(_half(name) for name, _ in pairs):"
 MOMENT = 'MOMENT = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})Z")'
 FOUND = "found = MOMENT.fullmatch(_text(root, name))"
 CODE = 'CODE = re.compile(r"[A-Za-z0-9-]{1,40}")'
 
 ALL = [
     # The bytes.
-    change("bytes.guessed", "Python guesses how the bytes are meant", ("a BOM in front",), (DECODE, "text = body")),
-    change("bytes.utf16", "UTF-16 is read as well", ("UTF-16",), (DECODE, 'text = body.decode("utf-16-le" if b"\\0" in body else "utf-8", "surrogateescape")')),
-    change("bytes.strict", "Any byte that is not UTF-8 makes it unreadable", ("a byte that is not UTF-8 in a field that is read", "a byte that is not UTF-8 in a field that is not known"), (DECODE, 'text = body.decode("utf-8")')),
-    change("bytes.lost", "What is not UTF-8 is left out", ("a byte that is not UTF-8 in a field that is read", "a byte that is not UTF-8 in a name"), (DECODE, 'text = body.decode("utf-8", "ignore")')),
-    change("bytes.bom", "A BOM is passed over", ("a BOM in front",), (DECODE, 'text = body.decode("utf-8-sig", "surrogateescape")')),
-    change("bytes.trimmed", "Every kind of space around it is taken off", ("a space that is none in JSON",), (DECODE, 'text = body.decode("utf-8", "surrogateescape").strip()')),
+    change("bytes.guessed", "Python guesses how the bytes are meant", ("a BOM in front",), (DECODE, "body")),
+    change("bytes.utf16", "UTF-16 is read as well", ("UTF-16",), (DECODE, 'body.decode("utf-16-le" if b"\\0" in body else "utf-8", "surrogateescape")')),
+    change("bytes.strict", "Any byte that is not UTF-8 makes it unreadable", ("a byte that is not UTF-8 in a field that is read", "a byte that is not UTF-8 in a field that is not known", "a byte that is not UTF-8 in a name"), (DECODE, 'body.decode("utf-8")')),
+    change("bytes.lost", "What is not UTF-8 is left out", ("a byte that is not UTF-8 in a field that is read", "two names that differ in a byte that is not UTF-8"), (DECODE, 'body.decode("utf-8", "ignore")')),
+    change("bytes.bom", "A BOM is passed over", ("a BOM in front",), (DECODE, 'body.decode("utf-8-sig", "surrogateescape")')),
+    change("bytes.trimmed", "Every kind of space around it is taken off", ("a space that is none in JSON",), (DECODE, 'body.decode("utf-8", "surrogateescape").strip()')),
     # The JSON.
-    change("json.last_wins", "Of a name that stands twice, the last one wins", ("a name twice", "a name twice, once as an escape", "a name twice inside a field that is not known"), (TWICE, "if any(_half(name) for name in found):")),
-    change("json.first_level", "Only the names of the first level have to differ", ("a name twice inside a field that is not known",), (TWICE, 'if len(found) != len(pairs) and "type" in found or any(_half(name) for name in found):')),
-    change("json.any_name", "A name may be half a character", ("half a character in a name", "a byte that is not UTF-8 in a name"), (TWICE, "if len(found) != len(pairs):")),
+    change("json.last_wins", "Of a name that stands twice, the last one wins", ("a name twice", "a name twice, once as an escape", "a name twice inside a field that is not known"), (TWICE, "if False:")),
+    change("json.first_level", "Only the names of the first level have to differ", ("a name twice inside a field that is not known",), (TWICE, 'if len(found) != len(pairs) and "type" in found:')),
+    change("json.any_name", "A name may be half a character", ("half a character in a name", "a name with half a character and a byte that is not UTF-8"), (HALVES, "if False:")),
+    change("json.byte_in_a_name", "A byte that is not UTF-8 is minded in a name", ("a byte that is not UTF-8 in a name", "two names that differ in a byte that is not UTF-8"), (TWICE, "if len(found) != len(pairs) or any(_half(name) for name in found):")),
+    change("json.bytes_alike", "All bytes that are not UTF-8 are the same", ("two names that differ in a byte that is not UTF-8",), (DECODE, 'body.decode("utf-8", "replace")')),
     change("json.nan", "NaN and Infinity are numbers", ("cents is NaN", "cents is Infinity"), (", parse_constant=_refuse)", ")")),
-    change("json.rest", "What stands behind the first object does not matter", ("two of them", "a comment behind it"), (LOADS, "json.JSONDecoder(object_pairs_hook=_names_once, parse_int=Number, parse_float=Number, parse_constant=_refuse).raw_decode(text.lstrip(' \\t\\r\\n'))[0]")),
+    change("json.rest", "What stands behind the first object does not matter", ("two of them", "a comment behind it"), (LOADS, "json.JSONDecoder(object_pairs_hook=names, parse_int=Number, parse_float=Number, parse_constant=_refuse).raw_decode(text.lstrip(' \\t\\r\\n'))[0]")),
     change("json.control", "A line break may stand in a text", ("a line break in a text",), (", parse_constant=_refuse)", ", parse_constant=_refuse, strict=False)")),
     change("json.no_floor", "A body that is too deep for Python breaks the reader", ("the deepest body there can be",), ("except (ValueError, RecursionError):", "except ValueError:")),
     change("json.depth", "Any depth is fine", ("one too deep",), ("    if _depth(root) > DEEPEST:\n        raise Unreadable(NOT_JSON)\n", "")),
     change("json.depth_less", "One level less is allowed", ("as deep as is allowed",), ("DEEPEST = 8", "DEEPEST = 7")),
     change("json.depth_more", "One level more is allowed", ("one too deep",), ("DEEPEST = 8", "DEEPEST = 9")),
+    change("json.depth_in_lists", "Objects in lists are no depth", ("one too deep, with objects in lists",), ("item.values() if isinstance(item, dict) else item)]", "item.values() if isinstance(item, dict) else [inner for inner in item if isinstance(inner, list)])]")),
     change("json.depth_of_lists", "Only lists count as depth", ("one too deep",), ("if isinstance(item, (dict, list)):\n            deepest = max(deepest, level)", "if isinstance(item, (dict, list)):\n            level -= isinstance(item, dict)\n            deepest = max(deepest, level)")),
     change("json.not_an_object", "Nobody looks whether it is an object", ("only null", "only []", 'only "order.placed"'), ('    if not isinstance(root, dict):\n        raise Unreadable("not an object")\n', "")),
     # The type.
-    change("type.any", "Every type is an order", ("another type",), ('    if _text(root, "type") != "order.placed":\n        raise Unreadable("not a type that is known")\n', '    _text(root, "type")\n')),
-    change("type.family", "Every type that begins with order is one", ("another type",), ('if _text(root, "type") != "order.placed":', 'if not _text(root, "type").startswith("order."):')),
+    # Which reason is said.
+    change("first.type_last", "The type is looked at last", ("type and order are missing",), ('    if _text(root, "type") != "order.placed":\n        raise Unreadable("not a type that is known")\n    return {', '    found = {'), ('        "unknown": sorted(root.keys() - set(KNOWN)),\n    }\n', '        "unknown": sorted(root.keys() - set(KNOWN)),\n    }\n    if _text(root, "type") != "order.placed":\n        raise Unreadable("not a type that is known")\n    return found\n')),
+    change("first.sku", "The sku is looked at first", ("order and sku are missing", "half a character in the sku, and the order is missing"), ('    return {\n        "order"', '    _code(root, "sku")\n    return {\n        "order"')),
+    change("first.quantity", "The quantity is looked at before the sku", ("sku and quantity are missing",), ('        "sku": _code(root, "sku"),', '        "quantity": _whole(root, "quantity", 1, 999),\n        "sku": _code(root, "sku"),')),
+    change("first.cents", "The cents are looked at before the quantity", ("quantity and cents are missing",), ('        "quantity": _whole(root, "quantity", 1, 999),', '        "cents": _whole(root, "cents", 0, 100_000_000),\n        "quantity": _whole(root, "quantity", 1, 999),')),
+    change("first.moment", "The moment is looked at before the cents", ("cents and placed_at are missing",), ('        "cents": _whole(root, "cents", 0, 100_000_000),', '        "placed_at": _moment(root, "placed_at"),\n        "cents": _whole(root, "cents", 0, 100_000_000),')),
+    change("type.any", "Every type is an order", ("another type, and all else as it should be", "the type in other letters"), ('    if _text(root, "type") != "order.placed":\n        raise Unreadable("not a type that is known")\n', '    _text(root, "type")\n')),
+    change("type.family", "Every type that begins with order is one", ("another type, and all else as it should be",), ('if _text(root, "type") != "order.placed":', 'if not _text(root, "type").startswith("order."):')),
     change("type.letters", "Large and small letters of the type are the same", ("the type in other letters",), ('if _text(root, "type") != "order.placed":', 'if _text(root, "type").lower() != "order.placed":')),
     change("type.as_written", "The type is compared as it was written", ("the type, written with an escape",), ('if _text(root, "type") != "order.placed":', 'if _text(root, "type") != "order.placed" or b\'"order.placed"\' not in body:')),
     change("type.optional", "A type that is missing is an order", ("an empty object",), ('if _text(root, "type") != "order.placed":', 'if root.setdefault("type", "order.placed") and _text(root, "type") != "order.placed":')),
@@ -82,8 +91,12 @@ ALL = [
     change("fields.swapped", "Quantity and cents are swapped", ("holds: quantity", "holds: cents"), ('"quantity": _whole(root, "quantity", 1, 999)', '"quantity": _whole(root, "cents", 0, 100_000_000)'), ('"cents": _whole(root, "cents", 0, 100_000_000)', '"cents": _whole(root, "quantity", 1, 999)')),
     change("fields.says_what_stood_there", "The reason repeats what stood in the body", ('order is "N 1"', 'sku is "BOX S"'), ("if not CODE.fullmatch(value):\n        raise _wrong(name)", "if not CODE.fullmatch(value):\n        raise _wrong(f'{name}: {value}')")),
     # Texts and codes.
-    change("text.numbers", "A number is a text", ("order is 1", "placed_at is 1764000000"), (TEXT, "if not isinstance(value, str):"), ("if not found:\n        raise _wrong(name)", "if not found:\n        raise _wrong(name) if not isinstance(root[name], Number) else Unreadable('a number')")),
+    change("text.numbers", "A number is a text", ("order is 1",), (TEXT, "if not isinstance(value, str):")),
     change("text.half", "Half a character is a text", ("half a character in the type", "a byte that is not UTF-8 in a field that is read"), ('    if _half(value):\n        raise Unreadable("not text")\n', "")),
+    change("text.half_first", "Only the first halves of characters are halves", ("order is \\udc00", "order is \\udfff"), ('"\\ud800" <= char <= "\\udfff"', '"\\ud800" <= char <= "\\udbff"')),
+    change("text.half_second", "Only the second halves of characters are halves", ("order is \\udbff",), ('"\\ud800" <= char <= "\\udfff"', '"\\udc00" <= char <= "\\udfff"')),
+    change("text.half_of_bytes", "Only what stands for a byte that is not UTF-8 is a half", ("order is \\udd00", "order is \\udc7f"), ('"\\ud800" <= char <= "\\udfff"', '"\\ud800" <= char <= "\\udbff" or "\\udc80" <= char <= "\\udcff"')),
+    change("names.half_at_the_top", "Half a character is only minded in a name at the top", ("half a character in a name further in",), ("if any(_half(name) for name, _ in pairs):", 'if any(_half(name) for name, _ in pairs) and (len(pairs) == 1 or "type" in dict(pairs)):')),
     change("code.any_letter", "Letters and digits of every alphabet are allowed", ('order is "É-1"', 'order is "Ｎ1"'), (CODE, 'CODE = re.compile(r"[^\\W_-]?[\\w-]{0,39}(?<!_)")'), ("if not CODE.fullmatch(value):", 'if not value or "_" in value or not CODE.fullmatch(value):')),
     change("code.underscore", "An underscore is allowed", ('order is "N_1"',), (CODE, 'CODE = re.compile(r"[A-Za-z0-9_-]{1,40}")')),
     change("code.space", "A space is allowed", ('order is "N 1"', 'sku is "BOX S"'), (CODE, 'CODE = re.compile(r"[A-Za-z0-9 -]{1,40}")')),

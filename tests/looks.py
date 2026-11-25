@@ -111,6 +111,6 @@ if __name__ == "__main__":
     all_of_them = examples()
     print("| The strict reader | |\n|---|---|")
     print(f"| Bodies it was asked about | {len(all_of_them)} |")
-    for known, meaning in (("test", "whose answer stands in a test of webhook-platform"), ("read", "whose answer was not run in C# yet")):
+    for known, meaning in (("test", "whose answer stands in a test of webhook-platform"), ("run", "whose answer webhook-platform gave once, by hand")):
         print(f"| of them, {meaning} | {sum(example.known == known for example in all_of_them)} |")
     print(f"| Answered as they should be | {len(all_of_them) - len(wrong_examples(load(READER)))} |")
